@@ -19,7 +19,6 @@ import {
   createDefaultSqlEditorConfig,
   createSqlEditorSlice,
   SqlEditorSliceState,
-  SqlEditorSliceConfig
 } from '@sqlrooms/sql-editor';
 import { createVegaChartTool } from '@sqlrooms/vega';
 import { DatabaseIcon } from 'lucide-react';
@@ -40,7 +39,7 @@ export const RoomPanelTypes = z.enum([
 export type RoomPanelTypes = z.infer<typeof RoomPanelTypes>;
 
 export const RoomConfig =
-  BaseRoomConfig.merge(AiSliceConfig).merge(SqlEditorSliceConfig);
+  BaseRoomConfig.merge(AiSliceConfig);
 export type RoomConfig = z.infer<typeof RoomConfig>;
 
 type CustomRoomState = {
@@ -59,7 +58,6 @@ export type RoomState = RoomShellSliceState<RoomConfig> &
 export const { roomStore, useRoomStore } = createRoomStore<RoomConfig, RoomState>(
   persist(
     (set, get, store) => ({
-      // Base room shell config
       ...createRoomShellSlice<RoomConfig>({
         config: {
           layout: {
@@ -101,14 +99,14 @@ export const { roomStore, useRoomStore } = createRoomStore<RoomConfig, RoomState
         },
       })(set, get, store),
 
-      // SQL editor slice
       ...createSqlEditorSlice()(set, get, store),
 
-      // AI slice with local-only config
       ...createAiSlice({
-        getApiKey: () => '', // Local models don't need API keys
+        getApiKey: () => '',
+
         customTools: {
           chart: createVegaChartTool(),
+
           echo: {
             description: 'A simple echo tool that returns the input text',
             parameters: z.object({
@@ -124,14 +122,54 @@ export const { roomStore, useRoomStore } = createRoomStore<RoomConfig, RoomState
             },
             component: EchoToolResult,
           },
+
+          query_executor: {
+            description: 'Run a SQL query and return the result',
+            parameters: z.object({
+              sql: z.string().describe('The SQL query to run'),
+            }),
+            execute: async (
+              { sql }: { sql: string },
+              options: any
+            ) => {
+              const connector = options?.connector;
+              if (!connector) {
+                return {
+                  llmResult: {
+                    success: false,
+                    error: 'No database connector found.',
+                  },
+                };
+              }
+
+              try {
+                const result = await connector.queryJson(sql);
+                return {
+                  llmResult: {
+                    success: true,
+                    details: JSON.stringify(result, null, 2),
+                  },
+                };
+              } catch (err: any) {
+                return {
+                  llmResult: {
+                    success: false,
+                    error: `Query failed: ${err.message}`,
+                  },
+                };
+              }
+            },
+          },
         },
+
         getInstructions: (tablesSchema: DataTable[]) => {
           const defaultInstructions = getDefaultInstructions(tablesSchema);
-          return `${defaultInstructions}. Please be polite and concise.`;
+          return `${defaultInstructions}
+You can run SQL queries using the query_executor tool. 
+If the user asks a question that requires querying data, generate the SQL, execute it, and summarize the result.`;
         },
       })(set, get, store),
 
-      // Local model selection (no API)
       selectedModel: {
         model: DEFAULT_MODEL,
         provider: 'ollama',
