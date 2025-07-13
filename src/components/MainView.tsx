@@ -1,15 +1,11 @@
-import {Input, SkeletonPane} from '@sqlrooms/ui';
-import {KeyIcon} from 'lucide-react';
+import { SkeletonPane } from '@sqlrooms/ui';
 import {
   AnalysisResultsContainer,
   SessionControls,
   QueryControls,
   ModelSelector,
 } from '@sqlrooms/ai';
-import {useRoomStore} from '../store';
-import {LLM_MODELS} from '../models';
-import {capitalize} from '@sqlrooms/utils';
-import {useMemo} from 'react';
+import { useRoomStore } from '../store';
 
 export const MainView: React.FC = () => {
   const currentSessionId = useRoomStore((s) => s.config.ai.currentSessionId);
@@ -18,48 +14,23 @@ export const MainView: React.FC = () => {
     return sessions.find((session) => session.id === currentSessionId);
   });
 
-  // Check if data is available
   const isDataAvailable = useRoomStore((state) => state.room.initialized);
 
-  const apiKeys = useRoomStore((s) => s.apiKeys);
-  const setProviderApiKey = useRoomStore((s) => s.setProviderApiKey);
-
-  // The current model is from the session
-  const currentModelProvider =
-    currentSession?.modelProvider || LLM_MODELS[0].name;
-
-  const apiKey = apiKeys[currentModelProvider] || '';
-
-  const onApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProviderApiKey(currentModelProvider, e.target.value);
-  };
-
-  // Transform LLM_MODELS into the format expected by ModelSelector
-  const modelOptions = useMemo(
-    () =>
-      LLM_MODELS.flatMap((provider) =>
-        provider.models.map((model) => ({
-          provider: provider.name,
-          label: model,
-          value: model,
-        })),
-      ),
-    [],
-  );
+  const modelOptions = [
+    { provider: 'ollama', label: 'mistral', value: 'mistral' },
+    { provider: 'ollama', label: 'llama3', value: 'llama3' },
+    { provider: 'ollama', label: 'phi3', value: 'phi3' },
+  ];
 
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden p-4">
-      {/* Display SessionControls at the top */}
       <div className="mb-4">
         <SessionControls />
       </div>
 
-      {/* Display AnalysisResultsContainer without the session controls UI */}
       <div className="flex-grow overflow-auto">
         {isDataAvailable ? (
-          <AnalysisResultsContainer
-            key={currentSessionId} // will prevent scrolling to bottom after changing current session
-          />
+          <AnalysisResultsContainer key={currentSessionId} />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center">
             <SkeletonPane className="p-4" />
@@ -70,16 +41,6 @@ export const MainView: React.FC = () => {
 
       <QueryControls placeholder="Type here what would you like to learn about the data? Something like 'What is the max magnitude of the earthquakes by year?'">
         <div className="flex items-center justify-end gap-2">
-          <div className="relative flex items-center">
-            <KeyIcon className="absolute left-2 h-4 w-4" />
-            <Input
-              className="w-[165px] pl-8"
-              type="password"
-              placeholder={`${capitalize(currentModelProvider)} API Key`}
-              value={apiKey}
-              onChange={onApiKeyChange}
-            />
-          </div>
           <ModelSelector models={modelOptions} className="w-[200px]" />
         </div>
       </QueryControls>
